@@ -21,9 +21,9 @@ let camera = {
 
 let player = {
 	velocities: {
-		x: 0,
-		y: 0,
-		z: 0
+		x: 1,
+		y: 1,
+		z: 1
 	},
 	traction: 0.05,
 	rotation: {
@@ -165,6 +165,7 @@ function main() {
 			id: 0,
 			scale: [1,1,1],
 			position: [0,0,0],
+			localMatrix: new Float32Array(16),
 			rotationAxis: [0,0,0],
 			vertices: orange_car_object.meshes[0].vertices,
 			indices: [].concat.apply([], orange_car_object.meshes[0].faces),
@@ -195,6 +196,7 @@ function main() {
 			id: 1,
 			scale: [5,5,5],
 			position: [10,0,1],
+			localMatrix: new Float32Array(16),
 			rotationAxis: [0,0,0],
 			vertices: castle_object.meshes[0].vertices,
 			indices: [].concat.apply([], castle_object.meshes[0].faces),
@@ -314,7 +316,7 @@ function render(elements, gl, program) {
 
 		let positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
 		let texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
-		let normalAttribLocation = gl.getAttribLocation(program, "vertNormal")
+		let normalAttribLocation = gl.getAttribLocation(program, "vertNormal");
 		// VERTEXBUFFER ATTRIBUTES
 		gl.bindBuffer(gl.ARRAY_BUFFER, object.vertexBufferObject);
 		gl.vertexAttribPointer(
@@ -372,15 +374,17 @@ function render(elements, gl, program) {
 		var identityMatrix = new Float32Array(16);
 		mat4.identity(identityMatrix);
 		let angle = performance.now() / 1000 / 6 * 2 * Math.PI;
+		mat4.identity(object.localMatrix);
+
+		
+		// mat4.translate(worldMatrix, worldMatrix, [5, 1, 1]);
 		if(object.id == 0) {
-			mat4.rotate(yRotationMatrix, worldMatrix, object.rotationAxis[0], [0, 1, 0]);
-			mat4.mul(worldMatrix, worldMatrix, yRotationMatrix);
+			mat4.translate(object.localMatrix, object.localMatrix, [player.velocities.x, player.velocities.y, player.velocities.z]);
+			mat4.rotate(yRotationMatrix, object.localMatrix, object.rotationAxis[0], [0, 1, 0]);
+			mat4.mul(object.localMatrix, object.localMatrix, yRotationMatrix);
 		}
-		mat4.translate(
-			worldMatrix,
-			worldMatrix,
-			[object.position[0], object.position[1], object.position[2]]
-		)
+		mat4.mul(worldMatrix, worldMatrix, object.localMatrix);
+
 		mat4.scale(worldMatrix, worldMatrix, object.scale);
 
 		// Apply object texture
@@ -446,10 +450,10 @@ window.addEventListener("keypress", event => {
 	}
 
 	if(event.key == "8") {
-		if(player.velocities.z > -0.5) player.velocities.z -= speed;
+		if(player.velocities.z > -1) player.velocities.z -= speed;
 	}
 	if(event.key == "2") {
-		if(player.velocities.z < 0.5) player.velocities.z += speed;
+		if(player.velocities.z < 1) player.velocities.z += speed;
 	}
 
 	if(event.key == "4") {
