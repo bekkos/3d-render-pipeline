@@ -3,11 +3,11 @@ canvas.width = innerWidth;
 canvas.height = innerHeight;
 var lastUpdate = Date.now();
 let camera = {
-	x: 0,
-	y: 0,
-	z: 0,
-	rotX: 0,
-	rotY: 0,
+	x: -0.5,
+	y: -1.5,
+	z: 3,
+	rotX: -0.2,
+	rotY: -0.5,
 	rotZ: 0,
 	velRotX: 0,
 	velRotY: 0,
@@ -19,12 +19,33 @@ let camera = {
 	gravity: 0
 }
 
+let player = {
+	velocities: {
+		x: 0,
+		y: 0,
+		z: 0
+	},
+	traction: 0.05,
+	rotation: {
+		x: 0,
+		y: 0,
+		z: 0
+	}
+}
+
 
 
 
 /* IMPORT OBJECTS AND TEXTURES */
+// car
 let orange_car_object;
 let orange_car_texture;
+
+// castle
+let castle_object;
+let castle_texture;
+
+// test
 let test_texture = new Image();
 test_texture.src = "./objects/test-texture.jpg";
 
@@ -32,14 +53,16 @@ fetch("./objects/orange_car/orange_car_model.json")
 .then((response) => response.json())
 .then(data => orange_car_object = data);
 
-fetch("./objects/orange_car/orange_car_texture.png")
-.then((response) => response.body)
-.then(data => orange_car_texture = data);
+
+fetch("./objects/castle/castle.json")
+.then(response => response.json())
+.then(data => castle_object = data);
+
 
 
 
 function main() {
-
+	console.log(castle_object)
 	/* CONFIGURATION */
 	const gl = canvas.getContext("webgl");
 
@@ -62,15 +85,19 @@ function main() {
 	gl.shaderSource(vertShader, `
 		attribute vec3 vertPosition;
 		attribute vec2 vertTexCoord;
+		attribute vec3 vertNormal;
+
 		varying vec2 fragTexCoord;
+		varying vec3 fragNormal;
+
 		uniform mat4 mWorld;
 		uniform mat4 mView;
 		uniform mat4 mProj;
 		uniform float time;
 
-
 		void main() {
 			fragTexCoord = vertTexCoord;
+			fragNormal = (mWorld * vec4(vertNormal, 0.0)).xyz;
 			gl_Position = mProj * mView * mWorld * vec4(vertPosition, 1.0);
 		}
 	`);
@@ -78,11 +105,29 @@ function main() {
 	gl.shaderSource(fragShader, `
 		precision mediump float;
 
+		struct DirectionalLight
+		{
+			vec3 direction;
+			vec3 color;
+		};
+
 		varying vec2 fragTexCoord;
+		varying vec3 fragNormal;
+
 		uniform sampler2D sampler;
+		uniform vec3 ambientLightIntensity;
+		uniform DirectionalLight sun;
+
 		void main()
 		{
-			gl_FragColor = texture2D(sampler, fragTexCoord);
+			vec3 surfaceNormal = normalize(fragNormal);
+			vec3 normSunDir = normalize(sun.direction);
+			vec4 texel = texture2D(sampler, fragTexCoord);
+
+			vec3 lightIntensity = ambientLightIntensity +
+				sun.color * max(dot(fragNormal, normSunDir), 0.0);
+
+				gl_FragColor = vec4(texel.rgb * lightIntensity, texel.a);
 		}
 	`);
 	
@@ -118,10 +163,12 @@ function main() {
 	var elements = [
 		{
 			id: 0,
-			position: [5,0,5],
+			scale: [1,1,1],
+			position: [0,0,0],
 			rotationAxis: [0,0,0],
 			vertices: orange_car_object.meshes[0].vertices,
 			indices: [].concat.apply([], orange_car_object.meshes[0].faces),
+			normals: [].concat.apply([], orange_car_object.meshes[0].normals),
 			texture: document.getElementById("car-texture"),
 			positionAttributeData: {
 				elementsPerInstance: 3,
@@ -141,103 +188,18 @@ function main() {
 			vertexBufferObject: null,
 			indexBufferObject: null,
 			textureCoordBufferObject: null,
-			textureBufferObject: null
+			textureBufferObject: null,
+			normalBufferObject: null
 		},
 		{
 			id: 1,
-			position: [0,0,0],
+			scale: [5,5,5],
+			position: [10,0,1],
 			rotationAxis: [0,0,0],
-			vertices: 
-			[ // X, Y, Z           
-				// Top
-				-1.0, 1.0, -1.0, 
-				-1.0, 1.0, 1.0,  
-				1.0, 1.0, 1.0,   
-				1.0, 1.0, -1.0,  
-	
-				// Left
-				-1.0, 1.0, 1.0,  
-				-1.0, -1.0, 1.0, 
-				-1.0, -1.0, -1.0,
-				-1.0, 1.0, -1.0, 
-	
-				// Right
-				1.0, 1.0, 1.0,  
-				1.0, -1.0, 1.0, 
-				1.0, -1.0, -1.0,
-				1.0, 1.0, -1.0, 
-	
-				// Front
-				1.0, 1.0, 1.0,  
-				1.0, -1.0, 1.0,  
-				-1.0, -1.0, 1.0,  
-				-1.0, 1.0, 1.0,  
-	
-				// Back
-				1.0, 1.0, -1.0,  
-				1.0, -1.0, -1.0,  
-				-1.0, -1.0, -1.0,  
-				-1.0, 1.0, -1.0,  
-	
-				// Bottom
-				-1.0, -1.0, -1.0, 
-				-1.0, -1.0, 1.0,  
-				1.0, -1.0, 1.0,   
-				1.0, -1.0, -1.0,  
-			],
-			indices: 
-			[
-				// Top
-				0, 1, 2,
-				0, 2, 3,
-	
-				// Left
-				5, 4, 6,
-				6, 4, 7,
-	
-				// Right
-				8, 9, 10,
-				8, 10, 11,
-	
-				// Front
-				13, 12, 14,
-				15, 14, 12,
-	
-				// Back
-				16, 17, 18,
-				16, 18, 19,
-	
-				// Bottom
-				21, 20, 22,
-				22, 20, 23
-			],
-			texture: document.getElementById("crate-image"),
-			textureCoordinates: [
-				0, 0,
-				0, 1,
-				1, 1,
-				1, 0,
-				0, 0,
-				1, 0,
-				1, 1,
-				0, 1,
-				1, 1,
-				0, 1,
-				0, 0,
-				1, 0,
-				1, 1,
-				1, 0,
-				0, 0,
-				0, 1,
-				0, 0,
-				0, 1,
-				1, 1,
-				1, 0,
-				1, 1,
-				1, 0,
-				0, 0,
-				0, 1,
-			],
+			vertices: castle_object.meshes[0].vertices,
+			indices: [].concat.apply([], castle_object.meshes[0].faces),
+			normals: [].concat.apply([], castle_object.meshes[0].normals),
+			texture: test_texture,
 			positionAttributeData: {
 				elementsPerInstance: 3,
 				type: gl.FLOAT,
@@ -245,6 +207,7 @@ function main() {
 				byteSize: 3 * Float32Array.BYTES_PER_ELEMENT,
 				byteOffset: 0
 			},
+			textureCoordinates: [].concat.apply([], castle_object.meshes[0].texturecoords),
 			texCoordAttributeData: {
 				elementsPerInstance: 2,
 				type: gl.FLOAT,
@@ -255,10 +218,10 @@ function main() {
 			vertexBufferObject: null,
 			indexBufferObject: null,
 			textureCoordBufferObject: null,
-			textureBufferObject: null
-		}
+			textureBufferObject: null,
+			normalBufferObject: null
+		},
 	];
-
 
 	initiateElements(elements, gl, program);
 	gl.useProgram(program)
@@ -272,6 +235,7 @@ function initiateElements(elements, gl, program) {
 			object.vertexBufferObject = gl.createBuffer();
 			object.indexBufferObject = gl.createBuffer();
 			object.textureCoordBufferObject = gl.createBuffer();
+			object.normalBufferObject = gl.createBuffer();
 
 			// Create and create and configure texture
 			object.textureBufferObject = gl.createTexture();
@@ -299,6 +263,7 @@ function render(elements, gl, program) {
 	gl.clearColor(0.75, 0.85, 0.8, 1.0);
 	gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
 
+	// CAMERA RENDER
 	let matViewUniformLocation = gl.getUniformLocation(program, 'mView');
 	var viewMatrix = new Float32Array(16);
 	let matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
@@ -313,23 +278,24 @@ function render(elements, gl, program) {
 		viewMatrix, 
 		viewMatrix,
 		camera.rotX,
-		[camera.rotX, 0, 0]
+		[1, 0, 0]
 		);
 	mat4.rotate(
 		viewMatrix, 
 		viewMatrix,
 		camera.rotY,
-		[0, camera.rotY, 0]
+		[0, 1, 0]
 		);
 	mat4.rotate(
 		viewMatrix, 
 		viewMatrix,
 		camera.rotZ,
-		[0, 0, camera.rotZ]
+		[0, 0, 1]
 		);
 		gl.uniformMatrix4fv(matViewUniformLocation, gl.FALSE, viewMatrix);
 		gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
 
+	// OBJECT RENDER
 	elements.forEach(object => {
 		
 		gl.useProgram(program);
@@ -342,11 +308,14 @@ function render(elements, gl, program) {
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, object.textureCoordBufferObject);
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(object.textureCoordinates), gl.STATIC_DRAW);
-		
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, object.normalBufferObject);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(object.normals), gl.STATIC_DRAW);
 
 		let positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
 		let texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
-
+		let normalAttribLocation = gl.getAttribLocation(program, "vertNormal")
+		// VERTEXBUFFER ATTRIBUTES
 		gl.bindBuffer(gl.ARRAY_BUFFER, object.vertexBufferObject);
 		gl.vertexAttribPointer(
 			positionAttribLocation,
@@ -357,8 +326,7 @@ function render(elements, gl, program) {
 			object.positionAttributeData.byteOffset
 		)
 		gl.enableVertexAttribArray(positionAttribLocation);
-
-		
+		// TEXTURECOORD ATTRIBUTES
 		gl.bindBuffer(gl.ARRAY_BUFFER, object.textureCoordBufferObject);
 		gl.vertexAttribPointer(
 			texCoordAttribLocation,
@@ -368,9 +336,21 @@ function render(elements, gl, program) {
 			object.texCoordAttributeData.byteSize,
 			object.texCoordAttributeData.byteOffset
 		)
-
 		gl.enableVertexAttribArray(texCoordAttribLocation);
 		
+		// NORMAL ATTRIBUTES
+		gl.bindBuffer(gl.ARRAY_BUFFER, object.normalBufferObject);
+		gl.vertexAttribPointer(
+			normalAttribLocation,
+			3,
+			gl.FLOAT,
+			gl.TRUE,
+			3 * Float32Array.BYTES_PER_ELEMENT,
+			0
+		);
+		gl.enableVertexAttribArray(normalAttribLocation);
+
+
 		var matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
 		var matProjUniformLocation = gl.getUniformLocation(program, 'mProj');
 		var worldMatrix = new Float32Array(16);
@@ -378,7 +358,10 @@ function render(elements, gl, program) {
 
 		mat4.identity(worldMatrix);
 		mat4.perspective(projMatrix, glMatrix.toRadian(45), canvas.clientWidth / canvas.clientHeight, 0.1, 1000.0);
-		gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
+		
+		// mat4.scale(worldMatrix, worldMatrix, [1,1,1]);
+
+		
 		gl.uniformMatrix4fv(matProjUniformLocation, gl.FALSE, projMatrix);
 		let timeLocation = gl.getUniformLocation(program, "time")
 		gl.uniform1f(timeLocation, performance.now());
@@ -389,13 +372,16 @@ function render(elements, gl, program) {
 		var identityMatrix = new Float32Array(16);
 		mat4.identity(identityMatrix);
 		let angle = performance.now() / 1000 / 6 * 2 * Math.PI;
-		//mat4.rotate(yRotationMatrix, identityMatrix, angle, object.rotationAxis);
-		//mat4.mul(worldMatrix, worldMatrix, yRotationMatrix);
+		if(object.id == 0) {
+			mat4.rotate(yRotationMatrix, worldMatrix, object.rotationAxis[0], [0, 1, 0]);
+			mat4.mul(worldMatrix, worldMatrix, yRotationMatrix);
+		}
 		mat4.translate(
 			worldMatrix,
 			worldMatrix,
 			[object.position[0], object.position[1], object.position[2]]
 		)
+		mat4.scale(worldMatrix, worldMatrix, object.scale);
 
 		// Apply object texture
 		gl.texImage2D(
@@ -407,6 +393,16 @@ function render(elements, gl, program) {
 			object.texture
 		)
 
+		var ambientUniformLocation = gl.getUniformLocation(program, 'ambientLightIntensity');
+		var sunlightDirUniformLocation = gl.getUniformLocation(program, 'sun.direction');
+		var sunlightIntUniformLocation = gl.getUniformLocation(program, 'sun.color');
+		
+		// SCENE LIGHT CONFIG
+		gl.uniform3f(ambientUniformLocation, 0.5, 0.5, 0.5);
+		gl.uniform3f(sunlightDirUniformLocation, -3.0, 4.0, -2.0);
+		gl.uniform3f(sunlightIntUniformLocation, 0.9, 0.9, 0.9);
+
+
 		gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
 		gl.drawElements(gl.TRIANGLES, object.indices.length, gl.UNSIGNED_SHORT, 0);
 		
@@ -416,7 +412,7 @@ function render(elements, gl, program) {
 
 // INPUT
 window.addEventListener("keypress", event => {
-	let speed = 0.1;
+	let speed = 0.05;
 	if(event.key == "w") {
 		camera.velZ -= speed;
 	}
@@ -437,31 +433,63 @@ window.addEventListener("keypress", event => {
 	}
 
 	if(event.key == "i") {
-		camera.velRotX += speed/8;
+		camera.velRotX += speed/6;
 	}
 	if(event.key == "k") {
-		camera.velRotX -= speed/8;
+		camera.velRotX -= speed/6;
 	}
 	if(event.key == "j") {
-		camera.velRotY += speed/8;
+		camera.velRotY += speed/6;
 	}
 	if(event.key == "l") {
-		camera.velRotY -= speed/8;
+		camera.velRotY -= speed/6;
 	}
+
+	if(event.key == "8") {
+		if(player.velocities.z > -0.5) player.velocities.z -= speed;
+	}
+	if(event.key == "2") {
+		if(player.velocities.z < 0.5) player.velocities.z += speed;
+	}
+
+	if(event.key == "4") {
+		player.rotation.x -= speed/6;
+	}
+	if(event.key == "6") {
+		player.rotation.x += speed/6;
+	}
+
 })
 
-function update(dt) {
+function update(dt, elements) {
 	calculateCameraPosition(dt);
+	calculateCarPosition(elements, dt)
 }
 
 function loop(elements, gl, program, now) {
 	var now = Date.now();
     var dt = now - lastUpdate;
     lastUpdate = now;
-	update(dt);
+	update(dt, elements);
 	render(elements, gl, program);
 	
 	requestAnimationFrame(() => loop(elements, gl, program, now));
+}
+
+
+function calculateCarPosition(elements, dt) {
+	let car = elements[0];
+	car.position[2] += player.velocities.z;
+	car.rotationAxis = [player.rotation.x, 0, 0];
+
+	if(player.velocities.z > 0.002) {
+		player.velocities.z -= (player.traction / dt);
+	} else if(player.velocities.z < -0.002) {
+		player.velocities.z += (player.traction / dt);
+	} else {
+		player.velocities.z = 0;
+	}
+
 }
 
 
@@ -512,5 +540,7 @@ function calculateCameraPosition(dt) {
 	} else {
 		camera.velRotY = 0;
 	}
+
+
 	
 }
