@@ -1,11 +1,41 @@
 const canvas = document.getElementById("game-surface");
 canvas.width = innerWidth;
 canvas.height = innerHeight;
-let cameraX = 0; cameraY = 0; cameraZ = 20;
-let cameraXRotation = 5; 
-let cameraYRotation = 0; 
-let cameraZRotation = 0; 
-let last = 0;
+var lastUpdate = Date.now();
+let camera = {
+	x: 0,
+	y: 0,
+	z: 0,
+	rotX: 0,
+	rotY: 0,
+	rotZ: 0,
+	velRotX: 0,
+	velRotY: 0,
+	velRotZ: 0,
+	velX: 0,
+	velY: 0,
+	velZ: 0,
+	traction: 0.01,
+	gravity: 0
+}
+
+
+
+
+/* IMPORT OBJECTS AND TEXTURES */
+let orange_car_object;
+let orange_car_texture;
+let test_texture = new Image();
+test_texture.src = "./objects/test-texture.jpg";
+
+fetch("./objects/orange_car/orange_car_model.json")
+.then((response) => response.json())
+.then(data => orange_car_object = data);
+
+fetch("./objects/orange_car/orange_car_texture.png")
+.then((response) => response.body)
+.then(data => orange_car_texture = data);
+
 
 
 function main() {
@@ -50,7 +80,6 @@ function main() {
 
 		varying vec2 fragTexCoord;
 		uniform sampler2D sampler;
-		
 		void main()
 		{
 			gl_FragColor = texture2D(sampler, fragTexCoord);
@@ -86,208 +115,181 @@ function main() {
 
 	/* CONFIGURATION END */
 	/* LOAD/DEFINE OBJECTS */
-	let elements = [
+	var elements = [
+		{
+			id: 0,
+			position: [5,0,5],
+			rotationAxis: [0,0,0],
+			vertices: orange_car_object.meshes[0].vertices,
+			indices: [].concat.apply([], orange_car_object.meshes[0].faces),
+			texture: document.getElementById("car-texture"),
+			positionAttributeData: {
+				elementsPerInstance: 3,
+				type: gl.FLOAT,
+				normalized: gl.FALSE,
+				byteSize: 3 * Float32Array.BYTES_PER_ELEMENT,
+				byteOffset: 0
+			},
+			textureCoordinates: [].concat.apply([], orange_car_object.meshes[0].texturecoords),
+			texCoordAttributeData: {
+				elementsPerInstance: 2,
+				type: gl.FLOAT,
+				normalized: gl.FALSE,
+				byteSize: 2 * Float32Array.BYTES_PER_ELEMENT,
+				byteOffset: 0
+			},
+			vertexBufferObject: null,
+			indexBufferObject: null,
+			textureCoordBufferObject: null,
+			textureBufferObject: null
+		},
 		{
 			id: 1,
 			position: [0,0,0],
 			rotationAxis: [0,0,0],
 			vertices: 
-			[ // X, Y, Z           U, V
+			[ // X, Y, Z           
 				// Top
-				-1.0, 1.0, -1.0,   0, 0,
-				-1.0, 1.0, 1.0,    0, 1,
-				1.0, 1.0, 1.0,     1, 1,
-				1.0, 1.0, -1.0,    1, 0,
-
+				-1.0, 1.0, -1.0, 
+				-1.0, 1.0, 1.0,  
+				1.0, 1.0, 1.0,   
+				1.0, 1.0, -1.0,  
+	
 				// Left
-				-1.0, 1.0, 1.0,    0, 0,
-				-1.0, -1.0, 1.0,   1, 0,
-				-1.0, -1.0, -1.0,  1, 1,
-				-1.0, 1.0, -1.0,   0, 1,
-
+				-1.0, 1.0, 1.0,  
+				-1.0, -1.0, 1.0, 
+				-1.0, -1.0, -1.0,
+				-1.0, 1.0, -1.0, 
+	
 				// Right
-				1.0, 1.0, 1.0,    1, 1,
-				1.0, -1.0, 1.0,   0, 1,
-				1.0, -1.0, -1.0,  0, 0,
-				1.0, 1.0, -1.0,   1, 0,
-
+				1.0, 1.0, 1.0,  
+				1.0, -1.0, 1.0, 
+				1.0, -1.0, -1.0,
+				1.0, 1.0, -1.0, 
+	
 				// Front
-				1.0, 1.0, 1.0,    1, 1,
-				1.0, -1.0, 1.0,    1, 0,
-				-1.0, -1.0, 1.0,    0, 0,
-				-1.0, 1.0, 1.0,    0, 1,
-
+				1.0, 1.0, 1.0,  
+				1.0, -1.0, 1.0,  
+				-1.0, -1.0, 1.0,  
+				-1.0, 1.0, 1.0,  
+	
 				// Back
-				1.0, 1.0, -1.0,    0, 0,
-				1.0, -1.0, -1.0,    0, 1,
-				-1.0, -1.0, -1.0,    1, 1,
-				-1.0, 1.0, -1.0,    1, 0,
-
+				1.0, 1.0, -1.0,  
+				1.0, -1.0, -1.0,  
+				-1.0, -1.0, -1.0,  
+				-1.0, 1.0, -1.0,  
+	
 				// Bottom
-				-1.0, -1.0, -1.0,   1, 1,
-				-1.0, -1.0, 1.0,    1, 0,
-				1.0, -1.0, 1.0,     0, 0,
-				1.0, -1.0, -1.0,    0, 1,
+				-1.0, -1.0, -1.0, 
+				-1.0, -1.0, 1.0,  
+				1.0, -1.0, 1.0,   
+				1.0, -1.0, -1.0,  
 			],
 			indices: 
 			[
 				// Top
 				0, 1, 2,
 				0, 2, 3,
-
+	
 				// Left
 				5, 4, 6,
 				6, 4, 7,
-
+	
 				// Right
 				8, 9, 10,
 				8, 10, 11,
-
+	
 				// Front
 				13, 12, 14,
 				15, 14, 12,
-
+	
 				// Back
 				16, 17, 18,
 				16, 18, 19,
-
+	
 				// Bottom
 				21, 20, 22,
 				22, 20, 23
+			],
+			texture: document.getElementById("crate-image"),
+			textureCoordinates: [
+				0, 0,
+				0, 1,
+				1, 1,
+				1, 0,
+				0, 0,
+				1, 0,
+				1, 1,
+				0, 1,
+				1, 1,
+				0, 1,
+				0, 0,
+				1, 0,
+				1, 1,
+				1, 0,
+				0, 0,
+				0, 1,
+				0, 0,
+				0, 1,
+				1, 1,
+				1, 0,
+				1, 1,
+				1, 0,
+				0, 0,
+				0, 1,
 			],
 			positionAttributeData: {
 				elementsPerInstance: 3,
 				type: gl.FLOAT,
 				normalized: gl.FALSE,
-				byteSize: 5 * Float32Array.BYTES_PER_ELEMENT,
+				byteSize: 3 * Float32Array.BYTES_PER_ELEMENT,
 				byteOffset: 0
 			},
 			texCoordAttributeData: {
 				elementsPerInstance: 2,
 				type: gl.FLOAT,
 				normalized: gl.FALSE,
-				byteSize: 5 * Float32Array.BYTES_PER_ELEMENT,
-				byteOffset: 3 * Float32Array.BYTES_PER_ELEMENT
-			},
-			vertexBufferObject: null,
-			indexBufferObject: null
-		},
-		{
-			id: 1,
-			position: [5,0,0],
-			rotationAxis: [0,0,0],
-			vertices: 
-			[ // X, Y, Z           U, V
-				// Top
-				-1.0, 1.0, -1.0,   0, 0,
-				-1.0, 1.0, 1.0,    0, 1,
-				1.0, 1.0, 1.0,     1, 1,
-				1.0, 1.0, -1.0,    1, 0,
-
-				// Left
-				-1.0, 1.0, 1.0,    0, 0,
-				-1.0, -1.0, 1.0,   1, 0,
-				-1.0, -1.0, -1.0,  1, 1,
-				-1.0, 1.0, -1.0,   0, 1,
-
-				// Right
-				1.0, 1.0, 1.0,    1, 1,
-				1.0, -1.0, 1.0,   0, 1,
-				1.0, -1.0, -1.0,  0, 0,
-				1.0, 1.0, -1.0,   1, 0,
-
-				// Front
-				1.0, 1.0, 1.0,    1, 1,
-				1.0, -1.0, 1.0,    1, 0,
-				-1.0, -1.0, 1.0,    0, 0,
-				-1.0, 1.0, 1.0,    0, 1,
-
-				// Back
-				1.0, 1.0, -1.0,    0, 0,
-				1.0, -1.0, -1.0,    0, 1,
-				-1.0, -1.0, -1.0,    1, 1,
-				-1.0, 1.0, -1.0,    1, 0,
-
-				// Bottom
-				-1.0, -1.0, -1.0,   1, 1,
-				-1.0, -1.0, 1.0,    1, 0,
-				1.0, -1.0, 1.0,     0, 0,
-				1.0, -1.0, -1.0,    0, 1,
-			],
-			indices: 
-			[
-				// Top
-				0, 1, 2,
-				0, 2, 3,
-
-				// Left
-				5, 4, 6,
-				6, 4, 7,
-
-				// Right
-				8, 9, 10,
-				8, 10, 11,
-
-				// Front
-				13, 12, 14,
-				15, 14, 12,
-
-				// Back
-				16, 17, 18,
-				16, 18, 19,
-
-				// Bottom
-				21, 20, 22,
-				22, 20, 23
-			],
-			positionAttributeData: {
-				elementsPerInstance: 3,
-				type: gl.FLOAT,
-				normalized: gl.FALSE,
-				byteSize: 5 * Float32Array.BYTES_PER_ELEMENT,
+				byteSize: 2 * Float32Array.BYTES_PER_ELEMENT,
 				byteOffset: 0
 			},
-			texCoordAttributeData: {
-				elementsPerInstance: 2,
-				type: gl.FLOAT,
-				normalized: gl.FALSE,
-				byteSize: 5 * Float32Array.BYTES_PER_ELEMENT,
-				byteOffset: 3 * Float32Array.BYTES_PER_ELEMENT
-			},
 			vertexBufferObject: null,
-			indexBufferObject: null
+			indexBufferObject: null,
+			textureCoordBufferObject: null,
+			textureBufferObject: null
 		}
 	];
+
+
 	initiateElements(elements, gl, program);
 	gl.useProgram(program)
-	
 	/* INIT GAME LOOP */
 	loop(elements, gl, program);
 }
 
 function initiateElements(elements, gl, program) {
 		elements.forEach(object => {
+			// Create buffer objects and store in element
 			object.vertexBufferObject = gl.createBuffer();
 			object.indexBufferObject = gl.createBuffer();
-			
-			
-	
-			// TEXTURE OBJECT
-			let elementTexture = gl.createTexture();
-			gl.bindTexture(gl.TEXTURE_2D, elementTexture);
+			object.textureCoordBufferObject = gl.createBuffer();
+
+			// Create and create and configure texture
+			object.textureBufferObject = gl.createTexture();
+			gl.bindTexture(gl.TEXTURE_2D, object.textureBufferObject);
+			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	
+
 			gl.texImage2D(
 				gl.TEXTURE_2D,
 				0,
 				gl.RGBA,
 				gl.RGBA,
 				gl.UNSIGNED_BYTE,
-				document.getElementById("crate-image")
-			)		
+				object.texture
+			)
 		})
 	
 }
@@ -305,25 +307,25 @@ function render(elements, gl, program) {
 	mat4.translate(
 		viewMatrix,
 		viewMatrix,
-		[cameraX,cameraY,cameraZ]
+		[camera.x, camera.y, camera.z]
 	)
 	mat4.rotate(
 		viewMatrix, 
 		viewMatrix,
-		cameraXRotation,
-		[cameraXRotation, 0, 0]
+		camera.rotX,
+		[camera.rotX, 0, 0]
 		);
 	mat4.rotate(
 		viewMatrix, 
 		viewMatrix,
-		cameraYRotation,
-		[0, cameraYRotation, 0]
+		camera.rotY,
+		[0, camera.rotY, 0]
 		);
 	mat4.rotate(
 		viewMatrix, 
 		viewMatrix,
-		cameraZRotation,
-		[0, 0, cameraZRotation]
+		camera.rotZ,
+		[0, 0, camera.rotZ]
 		);
 		gl.uniformMatrix4fv(matViewUniformLocation, gl.FALSE, viewMatrix);
 		gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
@@ -338,9 +340,14 @@ function render(elements, gl, program) {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, object.indexBufferObject);
 		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(object.indices), gl.STATIC_DRAW);
 
+		gl.bindBuffer(gl.ARRAY_BUFFER, object.textureCoordBufferObject);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(object.textureCoordinates), gl.STATIC_DRAW);
+		
+
 		let positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
 		let texCoordAttribLocation = gl.getAttribLocation(program, 'vertTexCoord');
 
+		gl.bindBuffer(gl.ARRAY_BUFFER, object.vertexBufferObject);
 		gl.vertexAttribPointer(
 			positionAttribLocation,
 			object.positionAttributeData.elementsPerInstance,
@@ -349,7 +356,10 @@ function render(elements, gl, program) {
 			object.positionAttributeData.byteSize,
 			object.positionAttributeData.byteOffset
 		)
+		gl.enableVertexAttribArray(positionAttribLocation);
 
+		
+		gl.bindBuffer(gl.ARRAY_BUFFER, object.textureCoordBufferObject);
 		gl.vertexAttribPointer(
 			texCoordAttribLocation,
 			object.texCoordAttributeData.elementsPerInstance,
@@ -359,7 +369,6 @@ function render(elements, gl, program) {
 			object.texCoordAttributeData.byteOffset
 		)
 
-		gl.enableVertexAttribArray(positionAttribLocation);
 		gl.enableVertexAttribArray(texCoordAttribLocation);
 		
 		var matWorldUniformLocation = gl.getUniformLocation(program, 'mWorld');
@@ -388,6 +397,16 @@ function render(elements, gl, program) {
 			[object.position[0], object.position[1], object.position[2]]
 		)
 
+		// Apply object texture
+		gl.texImage2D(
+			gl.TEXTURE_2D,
+			0,
+			gl.RGBA,
+			gl.RGBA,
+			gl.UNSIGNED_BYTE,
+			object.texture
+		)
+
 		gl.uniformMatrix4fv(matWorldUniformLocation, gl.FALSE, worldMatrix);
 		gl.drawElements(gl.TRIANGLES, object.indices.length, gl.UNSIGNED_SHORT, 0);
 		
@@ -397,51 +416,101 @@ function render(elements, gl, program) {
 
 // INPUT
 window.addEventListener("keypress", event => {
-	let speed = 1;
+	let speed = 0.1;
 	if(event.key == "w") {
-		cameraZ -= speed;
+		camera.velZ -= speed;
 	}
 	if(event.key == "s") {
-		cameraZ += speed;
+		camera.velZ += speed;
 	}
 	if(event.key == "a") {
-		cameraX -= speed;
+		camera.velX -= speed;
 	}
 	if(event.key == "d") {
-		cameraX += speed;
+		camera.velX += speed;
 	}
 	if(event.key == "e") {
-		cameraY -= speed ;
+		camera.velY -= speed ;
 	}
 	if(event.key == "q") {
-		cameraY += speed;
+		camera.velY += speed;
 	}
 
 	if(event.key == "i") {
-		cameraXRotation += speed/8;
+		camera.velRotX += speed/8;
 	}
 	if(event.key == "k") {
-		cameraXRotation -= speed/8;
+		camera.velRotX -= speed/8;
 	}
 	if(event.key == "j") {
-		cameraYRotation += speed/8;
+		camera.velRotY += speed/8;
 	}
 	if(event.key == "l") {
-		cameraYRotation -= speed/8;
+		camera.velRotY -= speed/8;
 	}
-	console.log({x: cameraX}, {y: cameraY}, {z: cameraZ});
 })
 
-function update() {
-
+function update(dt) {
+	calculateCameraPosition(dt);
 }
 
 function loop(elements, gl, program, now) {
-	var dt = Math.min(1, (now - last) / 1000);
-	console.log(dt)
-  	last = now;
-	update();
+	var now = Date.now();
+    var dt = now - lastUpdate;
+    lastUpdate = now;
+	update(dt);
 	render(elements, gl, program);
 	
 	requestAnimationFrame(() => loop(elements, gl, program, now));
+}
+
+
+function calculateCameraPosition(dt) {
+	camera.x += camera.velX;
+	camera.y += camera.velY;
+	camera.z += camera.velZ;
+
+	camera.rotX += camera.velRotX;
+	camera.rotY += camera.velRotY;
+
+	if(camera.velX > 0.002) {
+		camera.velX -= (camera.traction / dt);
+	} else if(camera.velX < -0.002) {
+		camera.velX += (camera.traction / dt);
+	} else {
+		camera.velX = 0;
+	}
+
+	if(camera.velY > 0.002) {
+		camera.velY -= (camera.traction / dt);
+	} else if(camera.velY < -0.002) {
+		camera.velY += (camera.traction / dt);
+	} else {
+		camera.velY = 0;
+	}
+
+	if(camera.velZ > 0.002) {
+		camera.velZ -= (camera.traction / dt);
+	} else if(camera.velZ < -0.002) {
+		camera.velZ += (camera.traction / dt);
+	} else {
+		camera.velZ = 0;
+	}
+
+	if(camera.velRotX > 0.002) {
+		camera.velRotX -= (camera.traction / dt);
+	} else if(camera.velRotX < -0.002) {
+		camera.velRotX += (camera.traction / dt);
+	} else {
+		camera.velRotX = 0;
+	}
+
+	if(camera.velRotY > 0.002) {
+		camera.velRotY -= (camera.traction / dt);
+	} else if(camera.velRotY < -0.002) {
+		camera.velRotY += (camera.traction / dt);
+	} else {
+		camera.velRotY = 0;
+	}
+	
 }
