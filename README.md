@@ -9,9 +9,9 @@ controls:
 * A - left
 * D - right
 * E - up
-* q - down
+* Q - down
 
-* j - rotate left
-* l - rotate right
-* i - rotate up
-* k - rotate down
+* J - rotate left
+* L - rotate right
+* I - rotate up
+* K - rotate down
