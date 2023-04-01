@@ -13,5 +13,5 @@ controls:
 
 * j - rotate left
 * l - rotate right
-* - rotate up
-* - rotate down
+* i - rotate up
+* k - rotate down
